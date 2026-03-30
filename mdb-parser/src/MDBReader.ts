@@ -46,13 +46,25 @@ export default class MDBReader {
     });
 
     this.#sysObjects = mSysObjectsTable.map((mSysObject) => {
-      const typeVal = mSysObject.Type;
-      const objectType = typeVal & 0x7f;
+      const flags = mSysObject.Flags;
+      const name = mSysObject.Name;
+      const id = mSysObject.Id;
+      
+      const isSystemByFlags = (flags & 0x80000000) !== 0 || (flags & 0x02) !== 0;
+      const isSystemById = id < 0;
+      const isSystem = isSystemByFlags || isSystemById;
+      
+      const isUserTable = !isSystem && !name.startsWith('MSys') && 
+        name !== 'DataAccessPages' && name !== 'Forms' && name !== 'Reports' &&
+        name !== 'Modules' && name !== 'Scripts' && name !== 'SysRel' &&
+        name !== 'AccessLayout' && name !== 'SummaryInfo' && name !== 'UserDefined';
+      
+      const objectType = isUserTable ? 1 : (isSystem ? 3 : 0);
       return {
-        objectName: mSysObject.Name,
-        objectType: isSysObjectType(objectType) ? objectType : null,
-        tablePage: maskTableId(mSysObject.Id),
-        flags: mSysObject.Flags,
+        objectName: name,
+        objectType: objectType,
+        tablePage: maskTableId(id),
+        flags: flags,
       };
     });
   }
@@ -90,24 +102,19 @@ export default class MDBReader {
 
     let tables = this.#sysObjects
       .filter((obj) => {
-        if (obj.objectType === null) {
-          return false;
-        }
-
         const systemObject = isSystemObject(obj);
-
+        
         if (filterSystem && filterLinked) {
-          return systemObject || obj.objectType === SysObjectTypes.LinkedTable;
+          return systemObject || obj.objectType === 6;
         }
         if (filterSystem) {
           return systemObject;
         }
         if (filterLinked) {
-          return obj.objectType === SysObjectTypes.LinkedTable;
+          return obj.objectType === 6;
         }
 
-        // Filter system objects if no option is selected
-        return !systemObject;
+        return obj.objectType === 1;
       })
       .map((obj) => obj.objectName);
 
