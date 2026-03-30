@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Axess - Access Database Viewer</title>
+  <script>
+    window.global = window;
+    
+    function createBufferFrom(arr) {
+      if (arr instanceof Uint8Array) return arr;
+      if (typeof arr === 'string') {
+        const buf = new Uint8Array(arr.length);
+        for (let i = 0; i < arr.length; i++) buf[i] = arr.charCodeAt(i);
+        return buf;
+      }
+      return new Uint8Array(arr);
+    }
+    
+    function createFullBuffer(arr) {
+      const buf = createBufferFrom(arr);
+      buf.copy = function(target, targetStart, sourceStart, sourceEnd) {
+        const src = sourceStart !== undefined ? this.slice(sourceStart, sourceEnd) : this;
+        const dst = targetStart !== undefined ? target.slice(targetStart) : target;
+        if (dst.set) dst.set(src);
+        return src.length;
+      };
+      buf.slice = function(start, end) {
+        const result = createBufferFrom(Uint8Array.prototype.slice.call(this, start, end));
+        return createFullBuffer(result);
+      };
+      buf.subarray = function(start, end) {
+        const result = createBufferFrom(Uint8Array.prototype.subarray.call(this, start, end));
+        return createFullBuffer(result);
+      };
+      buf.readUInt8 = function(offset) { return this[offset]; };
+      buf.readUInt16LE = function(offset) { return this[offset] | (this[offset + 1] << 8); };
+      buf.readUInt32LE = function(offset) { 
+        return this[offset] | (this[offset + 1] << 8) | (this[offset + 2] << 16) | (this[offset + 3] << 24);
+      };
+      buf.readUInt32BE = function(offset) {
+        return (this[offset] << 24) | (this[offset + 1] << 16) | (this[offset + 2] << 8) | this[offset + 3];
+      };
+      buf.readInt32LE = function(offset) {
+        const val = this.readUInt16LE(offset) | (this[offset + 2] << 16) | (this[offset + 3] << 24);
+        return val >= 0x80000000 ? val - 0x100000000 : val;
+      };
+      buf.writeUInt8 = function(val, offset) { this[offset] = val; };
+      buf.writeUInt16LE = function(val, offset) { this[offset] = val & 0xFF; this[offset + 1] = (val >> 8) & 0xFF; };
+      buf.writeUInt32LE = function(val, offset) {
+        this[offset] = val & 0xFF;
+        this[offset + 1] = (val >> 8) & 0xFF;
+        this[offset + 2] = (val >> 16) & 0xFF;
+        this[offset + 3] = (val >> 24) & 0xFF;
+      };
+      return buf;
+    }
+    
+    window.Buffer = {
+      alloc: function(size, fill, encoding) {
+        const arr = new Uint8Array(size);
+        if (fill !== undefined) {
+          arr.fill(typeof fill === 'number' ? fill : fill.charCodeAt(0));
+        }
+        return createFullBuffer(arr);
+      },
+      from: function(arr, encoding) {
+        const buf = createBufferFrom(arr);
+        return createFullBuffer(buf);
+      },
+      concat: function(arrays, length) {
+        if (!length) {
+          length = arrays.reduce((acc, arr) => acc + (arr.length || arr.byteLength || 0), 0);
+        }
+        const result = new Uint8Array(length);
+        let offset = 0;
+        for (const arr of arrays) {
+          const src = arr instanceof Uint8Array ? arr : createBufferFrom(arr);
+          result.set(src, offset);
+          offset += src.length;
+        }
+        return createFullBuffer(result);
+      },
+      isBuffer: function(obj) { return obj instanceof Uint8Array || (obj && obj.copy && obj.slice); }
+    };
+    window.process = {
+      env: {},
+      version: '',
+      nextTick: function(fn) { setTimeout(fn, 0); },
+      browser: true,
+      platform: 'browser',
+    };
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .upload-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      margin: 2rem;
+      background: var(--surface);
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+    }
+
+    .upload-area:hover, .upload-area.dragover {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+
+    .upload-area.hidden {
+      display: none;
+    }
+
+    .upload-icon {
+      width: 48px;
+      height: 48px;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .upload-text {
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .upload-text strong {
+      color: var(--primary);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .main-content {
+      display: none;
+      flex: 1;
+      gap: 0;
+    }
+
+    .main-content.visible {
+      display: flex;
+    }
+
+    .sidebar {
+      width: 250px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .table-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .table-item {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .table-item:hover {
+      background: var(--bg);
+    }
+
+    .table-item.active {
+      background: #eff6ff;
+      border-left: 3px solid var(--primary);
+    }
+
+    .table-name {
+      font-weight: 500;
+    }
+
+    .table-count {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .data-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .data-header {
+      padding: 1rem 1.5rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .data-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .data-info {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .table-container {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      font-size: 0.875rem;
+    }
+
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+    }
+
+    tr:hover td {
+      background: #f8fafc;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    .loading {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      color: var(--text-muted);
+    }
+
+    .loading.visible {
+      display: flex;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 0.5rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .error-message {
+      display: none;
+      padding: 1rem;
+      margin: 1rem 2rem;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      color: #dc2626;
+    }
+
+    .error-message.visible {
+      display: block;
+    }
+
+    .file-info {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border-radius: 6px;
+      font-size: 0.875rem;
+    }
+
+    .file-info.visible {
+      display: flex;
+    }
+
+    .file-info button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.25rem;
+    }
+
+    .file-info button:hover {
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Axess</h1>
+      <div class="file-info" id="fileInfo">
+        <span id="fileName"></span>
+        <button id="closeFile" title="Close file">✕</button>
+      </div>
+    </header>
+
+    <div class="error-message" id="errorMessage"></div>
+
+    <div class="upload-area" id="uploadArea">
+      <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+      </svg>
+      <p class="upload-text">
+        <strong>Click to upload</strong> or drag and drop<br>
+        Microsoft Access Database (.mdb, .accdb)
+      </p>
+      <input type="file" id="fileInput" accept=".mdb,.accdb">
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <span>Parsing database...</span>
+    </div>
+
+    <div class="main-content" id="mainContent">
+      <div class="sidebar">
+        <div class="sidebar-header">Tables</div>
+        <div class="table-list" id="tableList"></div>
+      </div>
+      <div class="data-panel">
+        <div class="data-header">
+          <h2 id="currentTable">Select a table</h2>
+          <span class="data-info" id="dataInfo"></span>
+        </div>
+        <div class="table-container" id="tableContainer">
+          <div class="empty-state">Select a table to view its data</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/main.ts"></script>
+</body>
+</html>

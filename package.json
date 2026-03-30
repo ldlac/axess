@@ -1,0 +1,26 @@
+{
+  "name": "axess",
+  "version": "1.0.0",
+  "description": "Browser-based MS Access database viewer",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "access-database",
+    "mdb",
+    "accdb",
+    "viewer"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vite": "^8.0.3"
+  },
+  "dependencies": {
+    "buffer": "^6.0.3"
+  }
+}
