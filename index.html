@@ -384,8 +384,12 @@
     .table-container {
       flex: 1;
       overflow: auto;
-      padding: 1rem;
       max-height: calc(100vh - 200px);
+      padding: 0;
+    }
+    
+    .table-container > div {
+      padding: 1rem;
     }
 
     table {
@@ -396,11 +400,12 @@
     }
 
     thead th {
-      background: var(--bg);
+      background: var(--surface);
       font-weight: 600;
       position: sticky;
       top: 0;
       z-index: 1;
+      box-shadow: 0 2px 0 var(--border);
     }
 
     table {
@@ -415,12 +420,10 @@
       text-align: left;
       border-bottom: 1px solid var(--border);
     }
-
-    th {
-      background: var(--bg);
+    
+    tbody th {
+      background: var(--surface);
       font-weight: 600;
-      position: sticky;
-      top: 0;
     }
 
     tr:hover td {
