@@ -33,17 +33,44 @@
         const result = createBufferFrom(Uint8Array.prototype.subarray.call(this, start, end));
         return createFullBuffer(result);
       };
-      buf.readUInt8 = function(offset) { return this[offset]; };
-      buf.readUInt16LE = function(offset) { return this[offset] | (this[offset + 1] << 8); };
+      buf.readUInt8 = function(offset) { return this[offset] || 0; };
+      buf.readUInt16LE = function(offset) { return (this[offset] || 0) | ((this[offset + 1] || 0) << 8); };
       buf.readUInt32LE = function(offset) { 
-        return this[offset] | (this[offset + 1] << 8) | (this[offset + 2] << 16) | (this[offset + 3] << 24);
+        return (this[offset] || 0) | ((this[offset + 1] || 0) << 8) | ((this[offset + 2] || 0) << 16) | ((this[offset + 3] || 0) << 24);
       };
       buf.readUInt32BE = function(offset) {
-        return (this[offset] << 24) | (this[offset + 1] << 16) | (this[offset + 2] << 8) | this[offset + 3];
+        return ((this[offset] || 0) << 24) | ((this[offset + 1] || 0) << 16) | ((this[offset + 2] || 0) << 8) | (this[offset + 3] || 0);
       };
       buf.readInt32LE = function(offset) {
-        const val = this.readUInt16LE(offset) | (this[offset + 2] << 16) | (this[offset + 3] << 24);
+        const val = this.readUInt16LE(offset) | ((this[offset + 2] || 0) << 16) | ((this[offset + 3] || 0) << 24);
         return val >= 0x80000000 ? val - 0x100000000 : val;
+      };
+      buf.readInt16LE = function(offset) {
+        const val = this.readUInt16LE(offset);
+        return val >= 0x8000 ? val - 0x10000 : val;
+      };
+      buf.readUIntLE = function(offset, bytes) {
+        let result = 0;
+        for (let i = 0; i < bytes; i++) {
+          result |= (this[offset + i] || 0) << (i * 8);
+        }
+        return result;
+      };
+      buf.readIntLE = function(offset, bytes) {
+        let result = this.readUIntLE(offset, bytes);
+        const signBit = 1 << (bytes * 8 - 1);
+        if (result >= signBit) {
+          result -= signBit * 2;
+        }
+        return result;
+      };
+      buf.readFloatLE = function(offset) {
+        const view = new DataView(this.buffer, this.byteOffset + offset, 4);
+        return view.getFloat32(0, true);
+      };
+      buf.readDoubleLE = function(offset) {
+        const view = new DataView(this.buffer, this.byteOffset + offset, 8);
+        return view.getFloat64(0, true);
       };
       buf.writeUInt8 = function(val, offset) { this[offset] = val; };
       buf.writeUInt16LE = function(val, offset) { this[offset] = val & 0xFF; this[offset + 1] = (val >> 8) & 0xFF; };
@@ -52,6 +79,92 @@
         this[offset + 1] = (val >> 8) & 0xFF;
         this[offset + 2] = (val >> 16) & 0xFF;
         this[offset + 3] = (val >> 24) & 0xFF;
+      };
+      buf.writeIntLE = function(val, offset, bytes) {
+        for (let i = 0; i < bytes; i++) {
+          this[offset + i] = (val >> (i * 8)) & 0xFF;
+        }
+      };
+      buf.writeFloatLE = function(val, offset) {
+        const view = new DataView(this.buffer, this.byteOffset + offset, 4);
+        view.setFloat32(0, val, true);
+      };
+      buf.writeDoubleLE = function(val, offset) {
+        const view = new DataView(this.buffer, this.byteOffset + offset, 8);
+        view.setFloat64(0, val, true);
+      };
+      buf.writeInt32LE = function(val, offset) {
+        this.writeUInt32LE(val, offset);
+      };
+      buf.toString = function(encoding, start, end) {
+        const slice = this.slice(start, end);
+        if (encoding === 'hex') {
+          return Array.from(slice).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        if (encoding === 'ascii') {
+          return String.fromCharCode.apply(null, Array.from(slice));
+        }
+        if (encoding === 'utf16le') {
+          let result = '';
+          for (let i = 0; i < slice.length - 1; i += 2) {
+            const code = slice[i] | (slice[i + 1] << 8);
+            result += String.fromCharCode(code);
+          }
+          return result;
+        }
+        if (encoding === 'ucs-2') {
+          return this.toString('utf16le', start, end);
+        }
+        return String.fromCharCode.apply(null, Array.from(slice));
+      };
+      buf.fill = function(val, start, end) {
+        start = start || 0;
+        end = end || this.length;
+        for (let i = start; i < end; i++) {
+          this[i] = typeof val === 'number' ? val : val.charCodeAt(0);
+        }
+        return this;
+      };
+      buf.swap16 = function() {
+        const result = new Uint8Array(this.length);
+        for (let i = 0; i < this.length; i += 2) {
+          result[i] = this[i + 1];
+          result[i + 1] = this[i];
+        }
+        return createFullBuffer(result);
+      };
+      buf.swap32 = function() {
+        const result = new Uint8Array(this.length);
+        for (let i = 0; i < this.length; i += 4) {
+          result[i] = this[i + 3];
+          result[i + 1] = this[i + 2];
+          result[i + 2] = this[i + 1];
+          result[i + 3] = this[i];
+        }
+        return createFullBuffer(result);
+      };
+      buf.indexOf = function(search, byteOffset) {
+        byteOffset = byteOffset || 0;
+        if (typeof search === 'number') {
+          for (let i = byteOffset; i < this.length; i++) {
+            if (this[i] === search) return i;
+          }
+          return -1;
+        }
+        if (typeof search === 'string') {
+          const searchBytes = [];
+          for (let i = 0; i < search.length; i++) {
+            searchBytes.push(search.charCodeAt(i));
+          }
+          outer: for (let i = byteOffset; i <= this.length - searchBytes.length; i++) {
+            for (let j = 0; j < searchBytes.length; j++) {
+              if (this[i + j] !== searchBytes[j]) continue outer;
+            }
+            return i;
+          }
+          return -1;
+        }
+        return -1;
       };
       return buf;
     }
@@ -63,6 +176,9 @@
           arr.fill(typeof fill === 'number' ? fill : fill.charCodeAt(0));
         }
         return createFullBuffer(arr);
+      },
+      allocUnsafe: function(size) {
+        return createFullBuffer(new Uint8Array(size));
       },
       from: function(arr, encoding) {
         const buf = createBufferFrom(arr);
@@ -366,7 +482,7 @@
       color: var(--primary);
     }
   </style>
-  <script type="module" crossorigin src="/assets/index-Bmm9NRyM.js"></script>
+  <script type="module" crossorigin src="/assets/index-C0PXW_J8.js"></script>
 </head>
 <body>
   <div class="app">

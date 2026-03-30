@@ -66,8 +66,25 @@ function handleFile(file: File): void {
       console.log("File size:", arrayBuffer.byteLength);
       const uint8Array = new Uint8Array(arrayBuffer);
       db = new MDBReader(uint8Array);
-      const tables = db.getTableNames();
-      console.log("Tables found:", tables);
+      
+      console.log("Creation date:", db.getCreationDate());
+      console.log("Password:", db.getPassword());
+      console.log("Default sort order:", db.getDefaultSortOrder());
+      
+      let tables = db.getTableNames();
+      console.log("Tables found (normal):", tables);
+      
+      if (tables.length === 0) {
+        tables = db.getTableNames({ systemTables: true });
+        console.log("Tables found (system):", tables);
+      }
+      
+      if (tables.length === 0) {
+        tables = db.getTableNames({ linkedTables: true });
+        console.log("Tables found (linked):", tables);
+      }
+      
+      console.log("All tables:", tables);
 
       if (!tables || tables.length === 0) {
         hideLoading();

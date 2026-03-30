@@ -15,16 +15,22 @@ export interface Options {
   password?: string | undefined;
 }
 
+export type ByteBuffer = Uint8Array | ArrayBuffer;
+
+function toBuffer(input: ByteBuffer): Buffer {
+  if (input instanceof ArrayBuffer) {
+    return Buffer.from(new Uint8Array(input));
+  }
+  return Buffer.from(input);
+}
+
 export default class MDBReader {
   #buffer: Buffer;
   #sysObjects: SysObject[];
   #database: Database;
 
-  /**
-   * @param buffer Buffer of the database.
-   */
-  constructor(buffer: Buffer, { password }: Options | undefined = {}) {
-    this.#buffer = buffer;
+  constructor(buffer: ByteBuffer, { password }: Options | undefined = {}) {
+    this.#buffer = toBuffer(buffer);
 
     assertPageType(this.#buffer, PageType.DatabaseDefinitionPage);
 
@@ -40,7 +46,8 @@ export default class MDBReader {
     });
 
     this.#sysObjects = mSysObjectsTable.map((mSysObject) => {
-      const objectType = mSysObject.Type & 0x7f;
+      const typeVal = mSysObject.Type;
+      const objectType = typeVal & 0x7f;
       return {
         objectName: mSysObject.Name,
         objectType: isSysObjectType(objectType) ? objectType : null,
@@ -67,59 +74,63 @@ export default class MDBReader {
   /**
    * Default sort order
    */
-  getDefaultSortOrder(): Readonly<SortOrder> {
+  getDefaultSortOrder(): SortOrder {
     return this.#database.getDefaultSortOrder();
   }
 
   /**
-   * Returns an array of table names.
-   *
-   * @param normalTables Includes user tables. Default true.
-   * @param systemTables Includes system tables. Default false.
-   * @param linkedTables Includes linked tables. Default false.
+   * Get all table names
    */
-  getTableNames({
-    normalTables = true,
-    systemTables = false,
-    linkedTables = false,
-  }: {
-    normalTables?: boolean | undefined;
-    systemTables?: boolean | undefined;
-    linkedTables?: boolean | undefined;
-  } = {}): string[] {
-    const filteredSysObjects: SysObject[] = [];
-    for (const sysObject of this.#sysObjects) {
-      if (sysObject.objectType === SysObjectTypes.Table) {
-        if (!isSystemObject(sysObject)) {
-          if (normalTables) {
-            filteredSysObjects.push(sysObject);
-          }
-        } else if (systemTables) {
-          filteredSysObjects.push(sysObject);
-        }
-      } else if (
-        sysObject.objectType === SysObjectTypes.LinkedTable &&
-        linkedTables
-      ) {
-        filteredSysObjects.push(sysObject);
-      }
-    }
+  getTableNames(options?: {
+    systemTables?: boolean;
+    linkedTables?: boolean;
+  }): string[] {
+    const filterSystem = options?.systemTables ?? false;
+    const filterLinked = options?.linkedTables ?? false;
 
-    return filteredSysObjects.map((o) => o.objectName);
+    let tables = this.#sysObjects
+      .filter((obj) => {
+        if (obj.objectType === null) {
+          return false;
+        }
+
+        const systemObject = isSystemObject(obj);
+
+        if (filterSystem && filterLinked) {
+          return systemObject || obj.objectType === SysObjectTypes.LinkedTable;
+        }
+        if (filterSystem) {
+          return systemObject;
+        }
+        if (filterLinked) {
+          return obj.objectType === SysObjectTypes.LinkedTable;
+        }
+
+        // Filter system objects if no option is selected
+        return !systemObject;
+      })
+      .map((obj) => obj.objectName);
+
+    // Remove duplicates
+    tables = [...new Set(tables)];
+
+    return tables;
   }
 
   /**
-   * Returns a table by its name.
-   *
-   * @param name Name of the table. Case sensitive.
+   * Get a table by name
    */
   getTable(name: string): Table {
-    const sysObject = this.#sysObjects
-      .filter((o) => o.objectType === SysObjectTypes.Table)
-      .find((o) => o.objectName === name);
+    const sysObject = this.#sysObjects.find(
+      (obj) => obj.objectName === name,
+    );
 
-    if (!sysObject) {
+    if (sysObject === undefined) {
       throw new Error(`Could not find table with name ${name}`);
+    }
+
+    if (sysObject.objectType === null) {
+      throw new Error(`Object ${name} is not a table`);
     }
 
     return new Table(name, this.#database, sysObject.tablePage);

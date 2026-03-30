@@ -10,7 +10,12 @@ export const enum PageType {
     PageUsageBitmaps = 0x05,
 }
 
-export function assertPageType(buffer: Buffer, pageType: PageType): void {
+interface BufferLike {
+    readonly length: number;
+    [index: number]: number;
+}
+
+export function assertPageType(buffer: BufferLike, pageType: PageType): void {
     if (buffer[0] !== pageType) {
         throw new Error(`Wrong page type. Expected ${pageType} but received ${buffer[0]}.`);
     }
