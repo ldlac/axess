@@ -327,6 +327,7 @@
     .table-list {
       flex: 1;
       overflow-y: auto;
+      max-height: calc(100vh - 250px);
     }
 
     .table-item {
@@ -384,6 +385,22 @@
       flex: 1;
       overflow: auto;
       padding: 1rem;
+      max-height: calc(100vh - 200px);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      font-size: 0.875rem;
+    }
+
+    thead th {
+      background: var(--bg);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
     }
 
     table {
