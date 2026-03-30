@@ -1,4 +1,4 @@
-import MDBReader from "./mdb-parser/MDBReader";
+import MDBReader from "./src/lib/MDBReader";
 
 let db: MDBReader | null = null;
 

@@ -1,13 +1,7 @@
-import { defineConfig } from 'vite';
-import path from 'path';
+import { defineConfig } from "vite";
 
 export default defineConfig({
   define: {
-    global: 'globalThis',
-  },
-  resolve: {
-    alias: {
-      'mdb-parser': path.resolve(__dirname, 'mdb-parser/src/MDBReader.ts'),
-    },
+    global: "globalThis",
   },
 });
