@@ -1,8 +1,8 @@
 import type { CodecHandler } from "../types.js";
 
 export function createIdentityHandler(): CodecHandler {
-    return {
-        decryptPage: (b) => b,
-        verifyPassword: () => true,
-    };
+  return {
+    decryptPage: (b) => b,
+    verifyPassword: () => true,
+  };
 }

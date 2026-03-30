@@ -1,44 +1,44 @@
 export interface EncryptionDescriptor {
-    keyData: KeyData;
-    passwordKeyEncryptor: PasswordKeyEncryptor;
+  keyData: KeyData;
+  passwordKeyEncryptor: PasswordKeyEncryptor;
 }
 
 export interface KeyData {
-    blockSize: number;
+  blockSize: number;
 
-    cipher: {
-        algorithm: string;
-        chaining: string;
-    };
+  cipher: {
+    algorithm: string;
+    chaining: string;
+  };
 
-    hash: {
-        size: number;
-        algorithm: string;
-    };
+  hash: {
+    size: number;
+    algorithm: string;
+  };
 
-    salt: Buffer;
+  salt: Buffer;
 }
 
 export interface PasswordKeyEncryptor {
-    blockSize: number;
-    keyBits: number;
-    spinCount: number;
+  blockSize: number;
+  keyBits: number;
+  spinCount: number;
 
-    cipher: {
-        algorithm: string;
-        chaining: string;
-    };
+  cipher: {
+    algorithm: string;
+    chaining: string;
+  };
 
-    hash: {
-        size: number;
-        algorithm: string;
-    };
+  hash: {
+    size: number;
+    algorithm: string;
+  };
 
-    salt: Buffer;
+  salt: Buffer;
 
-    encrypted: {
-        verifierHashInput: Buffer;
-        verifierHashValue: Buffer;
-        keyValue: Buffer;
-    };
+  encrypted: {
+    verifierHashInput: Buffer;
+    verifierHashValue: Buffer;
+    keyValue: Buffer;
+  };
 }

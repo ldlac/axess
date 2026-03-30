@@ -70,9 +70,10 @@ export class Buffer {
     sourceStart = 0,
     sourceEnd?: number,
   ): number {
-    const src = sourceEnd !== undefined
-      ? this.data.slice(sourceStart, sourceEnd)
-      : this.data.subarray(sourceStart);
+    const src =
+      sourceEnd !== undefined
+        ? this.data.slice(sourceStart, sourceEnd)
+        : this.data.subarray(sourceStart);
     target.data.set(src, targetStart);
     return src.length;
   }
@@ -94,7 +95,11 @@ export class Buffer {
       for (let i = 0; i < search.length; i++) {
         searchBytes.push(search.charCodeAt(i));
       }
-      outer: for (let i = byteOffset; i <= this.data.length - searchBytes.length; i++) {
+      outer: for (
+        let i = byteOffset;
+        i <= this.data.length - searchBytes.length;
+        i++
+      ) {
         for (let j = 0; j < searchBytes.length; j++) {
           if (this.data[i + j] !== searchBytes[j]) continue outer;
         }
@@ -114,17 +119,21 @@ export class Buffer {
   }
 
   readUInt32LE(offset = 0): number {
-    return (this.data[offset] || 0)
-      | ((this.data[offset + 1] || 0) << 8)
-      | ((this.data[offset + 2] || 0) << 16)
-      | ((this.data[offset + 3] || 0) << 24);
+    return (
+      (this.data[offset] || 0) |
+      ((this.data[offset + 1] || 0) << 8) |
+      ((this.data[offset + 2] || 0) << 16) |
+      ((this.data[offset + 3] || 0) << 24)
+    );
   }
 
   readUInt32BE(offset = 0): number {
-    return ((this.data[offset] || 0) << 24)
-      | ((this.data[offset + 1] || 0) << 16)
-      | ((this.data[offset + 2] || 0) << 8)
-      | (this.data[offset + 3] || 0);
+    return (
+      ((this.data[offset] || 0) << 24) |
+      ((this.data[offset + 1] || 0) << 16) |
+      ((this.data[offset + 2] || 0) << 8) |
+      (this.data[offset + 3] || 0)
+    );
   }
 
   readInt32LE(offset = 0): number {
@@ -155,12 +164,20 @@ export class Buffer {
   }
 
   readFloatLE(offset = 0): number {
-    const view = new DataView(this.data.buffer, this.data.byteOffset + offset, 4);
+    const view = new DataView(
+      this.data.buffer,
+      this.data.byteOffset + offset,
+      4,
+    );
     return view.getFloat32(0, true);
   }
 
   readDoubleLE(offset = 0): number {
-    const view = new DataView(this.data.buffer, this.data.byteOffset + offset, 8);
+    const view = new DataView(
+      this.data.buffer,
+      this.data.byteOffset + offset,
+      8,
+    );
     return view.getFloat64(0, true);
   }
 
@@ -195,22 +212,26 @@ export class Buffer {
   }
 
   writeFloatLE(val: number, offset = 0): this {
-    const view = new DataView(this.data.buffer, this.data.byteOffset + offset, 4);
+    const view = new DataView(
+      this.data.buffer,
+      this.data.byteOffset + offset,
+      4,
+    );
     view.setFloat32(0, val, true);
     return this;
   }
 
   writeDoubleLE(val: number, offset = 0): this {
-    const view = new DataView(this.data.buffer, this.data.byteOffset + offset, 8);
+    const view = new DataView(
+      this.data.buffer,
+      this.data.byteOffset + offset,
+      8,
+    );
     view.setFloat64(0, val, true);
     return this;
   }
 
-  toString(
-    encoding: string = "utf8",
-    start?: number,
-    end?: number,
-  ): string {
+  toString(encoding: string = "utf8", start?: number, end?: number): string {
     const slice = this.data.slice(start, end);
     if (encoding === "hex") {
       return Array.from(slice)

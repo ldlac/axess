@@ -5,16 +5,19 @@ import { createIdentityHandler } from "./handlers/identity.js";
 import { createJetCodecHandler } from "./handlers/jet.js";
 import { createOfficeCodecHandler } from "./handlers/office/index.js";
 
-export function createCodecHandler(databaseDefinitionPage: Buffer, password: string): CodecHandler {
-    const format = getJetFormat(databaseDefinitionPage);
-    switch (format.codecType) {
-        case CodecType.JET:
-            return createJetCodecHandler(databaseDefinitionPage);
+export function createCodecHandler(
+  databaseDefinitionPage: Buffer,
+  password: string,
+): CodecHandler {
+  const format = getJetFormat(databaseDefinitionPage);
+  switch (format.codecType) {
+    case CodecType.JET:
+      return createJetCodecHandler(databaseDefinitionPage);
 
-        case CodecType.OFFICE:
-            return createOfficeCodecHandler(databaseDefinitionPage, password);
+    case CodecType.OFFICE:
+      return createOfficeCodecHandler(databaseDefinitionPage, password);
 
-        default:
-            return createIdentityHandler();
-    }
+    default:
+      return createIdentityHandler();
+  }
 }

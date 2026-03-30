@@ -49,17 +49,26 @@ export default class MDBReader {
       const flags = mSysObject.Flags;
       const name = mSysObject.Name;
       const id = mSysObject.Id;
-      
-      const isSystemByFlags = (flags & 0x80000000) !== 0 || (flags & 0x02) !== 0;
+
+      const isSystemByFlags =
+        (flags & 0x80000000) !== 0 || (flags & 0x02) !== 0;
       const isSystemById = id < 0;
       const isSystem = isSystemByFlags || isSystemById;
-      
-      const isUserTable = !isSystem && !name.startsWith('MSys') && 
-        name !== 'DataAccessPages' && name !== 'Forms' && name !== 'Reports' &&
-        name !== 'Modules' && name !== 'Scripts' && name !== 'SysRel' &&
-        name !== 'AccessLayout' && name !== 'SummaryInfo' && name !== 'UserDefined';
-      
-      const objectType = isUserTable ? 1 : (isSystem ? 3 : 0);
+
+      const isUserTable =
+        !isSystem &&
+        !name.startsWith("MSys") &&
+        name !== "DataAccessPages" &&
+        name !== "Forms" &&
+        name !== "Reports" &&
+        name !== "Modules" &&
+        name !== "Scripts" &&
+        name !== "SysRel" &&
+        name !== "AccessLayout" &&
+        name !== "SummaryInfo" &&
+        name !== "UserDefined";
+
+      const objectType = isUserTable ? 1 : isSystem ? 3 : 0;
       return {
         objectName: name,
         objectType: objectType,
@@ -103,7 +112,7 @@ export default class MDBReader {
     let tables = this.#sysObjects
       .filter((obj) => {
         const systemObject = isSystemObject(obj);
-        
+
         if (filterSystem && filterLinked) {
           return systemObject || obj.objectType === 6;
         }
@@ -128,9 +137,7 @@ export default class MDBReader {
    * Get a table by name
    */
   getTable(name: string): Table {
-    const sysObject = this.#sysObjects.find(
-      (obj) => obj.objectName === name,
-    );
+    const sysObject = this.#sysObjects.find((obj) => obj.objectName === name);
 
     if (sysObject === undefined) {
       throw new Error(`Could not find table with name ${name}`);

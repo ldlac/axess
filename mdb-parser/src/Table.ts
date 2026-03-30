@@ -78,7 +78,6 @@ export class Table {
     this.#variableColumnCount = this.#definitionBuffer.readUInt16LE(
       this.#database.format.tableDefinitionPage.variableColumnCountOffset,
     );
-    console.log("Table constructor:", name, "rowCount:", this.#rowCount, "colCount:", this.#columnCount);
     // this.#fixedColumnCount = this.#columnCount - this.#variableColumnCount;
 
     // this.#logicalIndexCount = this.#definitionBuffer.readInt32LE(
@@ -129,8 +128,6 @@ export class Table {
    */
   getColumns(): Column[] {
     const columnDefinitions = this.#getColumnDefinitions();
-    
-    console.log("Column definitions for", this.#name, ":", columnDefinitions.map(c => c.name));
 
     columnDefinitions.sort((a, b) => a.index - b.index);
 

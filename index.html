@@ -1,553 +1,614 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Axess - Access Database Viewer</title>
-  <script>
-    window.global = window;
-    
-    function createBufferFrom(arr) {
-      if (arr instanceof Uint8Array) return arr;
-      if (typeof arr === 'string') {
-        const buf = new Uint8Array(arr.length);
-        for (let i = 0; i < arr.length; i++) buf[i] = arr.charCodeAt(i);
-        return buf;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Axess - Access Database Viewer</title>
+    <script>
+      window.global = window;
+
+      function createBufferFrom(arr) {
+        if (arr instanceof Uint8Array) return arr;
+        if (typeof arr === "string") {
+          const buf = new Uint8Array(arr.length);
+          for (let i = 0; i < arr.length; i++) buf[i] = arr.charCodeAt(i);
+          return buf;
+        }
+        return new Uint8Array(arr);
       }
-      return new Uint8Array(arr);
-    }
-    
-    function createFullBuffer(arr) {
-      const buf = createBufferFrom(arr);
-      buf.copy = function(target, targetStart, sourceStart, sourceEnd) {
-        const src = sourceStart !== undefined ? this.slice(sourceStart, sourceEnd) : this;
-        const dst = targetStart !== undefined ? target.slice(targetStart) : target;
-        if (dst.set) dst.set(src);
-        return src.length;
-      };
-      buf.slice = function(start, end) {
-        const result = createBufferFrom(Uint8Array.prototype.slice.call(this, start, end));
-        return createFullBuffer(result);
-      };
-      buf.subarray = function(start, end) {
-        const result = createBufferFrom(Uint8Array.prototype.subarray.call(this, start, end));
-        return createFullBuffer(result);
-      };
-      buf.readUInt8 = function(offset) { return this[offset] || 0; };
-      buf.readUInt16LE = function(offset) { return (this[offset] || 0) | ((this[offset + 1] || 0) << 8); };
-      buf.readUInt32LE = function(offset) { 
-        return (this[offset] || 0) | ((this[offset + 1] || 0) << 8) | ((this[offset + 2] || 0) << 16) | ((this[offset + 3] || 0) << 24);
-      };
-      buf.readUInt32BE = function(offset) {
-        return ((this[offset] || 0) << 24) | ((this[offset + 1] || 0) << 16) | ((this[offset + 2] || 0) << 8) | (this[offset + 3] || 0);
-      };
-      buf.readInt32LE = function(offset) {
-        const val = this.readUInt16LE(offset) | ((this[offset + 2] || 0) << 16) | ((this[offset + 3] || 0) << 24);
-        return val >= 0x80000000 ? val - 0x100000000 : val;
-      };
-      buf.readInt16LE = function(offset) {
-        const val = this.readUInt16LE(offset);
-        return val >= 0x8000 ? val - 0x10000 : val;
-      };
-      buf.readUIntLE = function(offset, bytes) {
-        let result = 0;
-        for (let i = 0; i < bytes; i++) {
-          result |= (this[offset + i] || 0) << (i * 8);
-        }
-        return result;
-      };
-      buf.readIntLE = function(offset, bytes) {
-        let result = this.readUIntLE(offset, bytes);
-        const signBit = 1 << (bytes * 8 - 1);
-        if (result >= signBit) {
-          result -= signBit * 2;
-        }
-        return result;
-      };
-      buf.readFloatLE = function(offset) {
-        const view = new DataView(this.buffer, this.byteOffset + offset, 4);
-        return view.getFloat32(0, true);
-      };
-      buf.readDoubleLE = function(offset) {
-        const view = new DataView(this.buffer, this.byteOffset + offset, 8);
-        return view.getFloat64(0, true);
-      };
-      buf.writeUInt8 = function(val, offset) { this[offset] = val; };
-      buf.writeUInt16LE = function(val, offset) { this[offset] = val & 0xFF; this[offset + 1] = (val >> 8) & 0xFF; };
-      buf.writeUInt32LE = function(val, offset) {
-        this[offset] = val & 0xFF;
-        this[offset + 1] = (val >> 8) & 0xFF;
-        this[offset + 2] = (val >> 16) & 0xFF;
-        this[offset + 3] = (val >> 24) & 0xFF;
-      };
-      buf.writeIntLE = function(val, offset, bytes) {
-        for (let i = 0; i < bytes; i++) {
-          this[offset + i] = (val >> (i * 8)) & 0xFF;
-        }
-      };
-      buf.writeFloatLE = function(val, offset) {
-        const view = new DataView(this.buffer, this.byteOffset + offset, 4);
-        view.setFloat32(0, val, true);
-      };
-      buf.writeDoubleLE = function(val, offset) {
-        const view = new DataView(this.buffer, this.byteOffset + offset, 8);
-        view.setFloat64(0, val, true);
-      };
-      buf.writeInt32LE = function(val, offset) {
-        this.writeUInt32LE(val, offset);
-      };
-      buf.toString = function(encoding, start, end) {
-        const slice = this.slice(start, end);
-        if (encoding === 'hex') {
-          return Array.from(slice).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-        if (encoding === 'ascii') {
-          return String.fromCharCode.apply(null, Array.from(slice));
-        }
-        if (encoding === 'utf16le') {
-          let result = '';
-          for (let i = 0; i < slice.length - 1; i += 2) {
-            const code = slice[i] | (slice[i + 1] << 8);
-            result += String.fromCharCode(code);
+
+      function createFullBuffer(arr) {
+        const buf = createBufferFrom(arr);
+        buf.copy = function (target, targetStart, sourceStart, sourceEnd) {
+          const src =
+            sourceStart !== undefined
+              ? this.slice(sourceStart, sourceEnd)
+              : this;
+          const dst =
+            targetStart !== undefined ? target.slice(targetStart) : target;
+          if (dst.set) dst.set(src);
+          return src.length;
+        };
+        buf.slice = function (start, end) {
+          const result = createBufferFrom(
+            Uint8Array.prototype.slice.call(this, start, end),
+          );
+          return createFullBuffer(result);
+        };
+        buf.subarray = function (start, end) {
+          const result = createBufferFrom(
+            Uint8Array.prototype.subarray.call(this, start, end),
+          );
+          return createFullBuffer(result);
+        };
+        buf.readUInt8 = function (offset) {
+          return this[offset] || 0;
+        };
+        buf.readUInt16LE = function (offset) {
+          return (this[offset] || 0) | ((this[offset + 1] || 0) << 8);
+        };
+        buf.readUInt32LE = function (offset) {
+          return (
+            (this[offset] || 0) |
+            ((this[offset + 1] || 0) << 8) |
+            ((this[offset + 2] || 0) << 16) |
+            ((this[offset + 3] || 0) << 24)
+          );
+        };
+        buf.readUInt32BE = function (offset) {
+          return (
+            ((this[offset] || 0) << 24) |
+            ((this[offset + 1] || 0) << 16) |
+            ((this[offset + 2] || 0) << 8) |
+            (this[offset + 3] || 0)
+          );
+        };
+        buf.readInt32LE = function (offset) {
+          const val =
+            this.readUInt16LE(offset) |
+            ((this[offset + 2] || 0) << 16) |
+            ((this[offset + 3] || 0) << 24);
+          return val >= 0x80000000 ? val - 0x100000000 : val;
+        };
+        buf.readInt16LE = function (offset) {
+          const val = this.readUInt16LE(offset);
+          return val >= 0x8000 ? val - 0x10000 : val;
+        };
+        buf.readUIntLE = function (offset, bytes) {
+          let result = 0;
+          for (let i = 0; i < bytes; i++) {
+            result |= (this[offset + i] || 0) << (i * 8);
           }
           return result;
-        }
-        if (encoding === 'ucs-2') {
-          return this.toString('utf16le', start, end);
-        }
-        return String.fromCharCode.apply(null, Array.from(slice));
-      };
-      buf.fill = function(val, start, end) {
-        start = start || 0;
-        end = end || this.length;
-        for (let i = start; i < end; i++) {
-          this[i] = typeof val === 'number' ? val : val.charCodeAt(0);
-        }
-        return this;
-      };
-      buf.swap16 = function() {
-        const result = new Uint8Array(this.length);
-        for (let i = 0; i < this.length; i += 2) {
-          result[i] = this[i + 1];
-          result[i + 1] = this[i];
-        }
-        return createFullBuffer(result);
-      };
-      buf.swap32 = function() {
-        const result = new Uint8Array(this.length);
-        for (let i = 0; i < this.length; i += 4) {
-          result[i] = this[i + 3];
-          result[i + 1] = this[i + 2];
-          result[i + 2] = this[i + 1];
-          result[i + 3] = this[i];
-        }
-        return createFullBuffer(result);
-      };
-      buf.indexOf = function(search, byteOffset) {
-        byteOffset = byteOffset || 0;
-        if (typeof search === 'number') {
-          for (let i = byteOffset; i < this.length; i++) {
-            if (this[i] === search) return i;
+        };
+        buf.readIntLE = function (offset, bytes) {
+          let result = this.readUIntLE(offset, bytes);
+          const signBit = 1 << (bytes * 8 - 1);
+          if (result >= signBit) {
+            result -= signBit * 2;
           }
-          return -1;
-        }
-        if (typeof search === 'string') {
-          const searchBytes = [];
-          for (let i = 0; i < search.length; i++) {
-            searchBytes.push(search.charCodeAt(i));
+          return result;
+        };
+        buf.readFloatLE = function (offset) {
+          const view = new DataView(this.buffer, this.byteOffset + offset, 4);
+          return view.getFloat32(0, true);
+        };
+        buf.readDoubleLE = function (offset) {
+          const view = new DataView(this.buffer, this.byteOffset + offset, 8);
+          return view.getFloat64(0, true);
+        };
+        buf.writeUInt8 = function (val, offset) {
+          this[offset] = val;
+        };
+        buf.writeUInt16LE = function (val, offset) {
+          this[offset] = val & 0xff;
+          this[offset + 1] = (val >> 8) & 0xff;
+        };
+        buf.writeUInt32LE = function (val, offset) {
+          this[offset] = val & 0xff;
+          this[offset + 1] = (val >> 8) & 0xff;
+          this[offset + 2] = (val >> 16) & 0xff;
+          this[offset + 3] = (val >> 24) & 0xff;
+        };
+        buf.writeIntLE = function (val, offset, bytes) {
+          for (let i = 0; i < bytes; i++) {
+            this[offset + i] = (val >> (i * 8)) & 0xff;
           }
-          outer: for (let i = byteOffset; i <= this.length - searchBytes.length; i++) {
-            for (let j = 0; j < searchBytes.length; j++) {
-              if (this[i + j] !== searchBytes[j]) continue outer;
+        };
+        buf.writeFloatLE = function (val, offset) {
+          const view = new DataView(this.buffer, this.byteOffset + offset, 4);
+          view.setFloat32(0, val, true);
+        };
+        buf.writeDoubleLE = function (val, offset) {
+          const view = new DataView(this.buffer, this.byteOffset + offset, 8);
+          view.setFloat64(0, val, true);
+        };
+        buf.writeInt32LE = function (val, offset) {
+          this.writeUInt32LE(val, offset);
+        };
+        buf.toString = function (encoding, start, end) {
+          const slice = this.slice(start, end);
+          if (encoding === "hex") {
+            return Array.from(slice)
+              .map((b) => b.toString(16).padStart(2, "0"))
+              .join("");
+          }
+          if (encoding === "ascii") {
+            return String.fromCharCode.apply(null, Array.from(slice));
+          }
+          if (encoding === "utf16le") {
+            let result = "";
+            for (let i = 0; i < slice.length - 1; i += 2) {
+              const code = slice[i] | (slice[i + 1] << 8);
+              result += String.fromCharCode(code);
             }
-            return i;
+            return result;
+          }
+          if (encoding === "ucs-2") {
+            return this.toString("utf16le", start, end);
+          }
+          return String.fromCharCode.apply(null, Array.from(slice));
+        };
+        buf.fill = function (val, start, end) {
+          start = start || 0;
+          end = end || this.length;
+          for (let i = start; i < end; i++) {
+            this[i] = typeof val === "number" ? val : val.charCodeAt(0);
+          }
+          return this;
+        };
+        buf.swap16 = function () {
+          const result = new Uint8Array(this.length);
+          for (let i = 0; i < this.length; i += 2) {
+            result[i] = this[i + 1];
+            result[i + 1] = this[i];
+          }
+          return createFullBuffer(result);
+        };
+        buf.swap32 = function () {
+          const result = new Uint8Array(this.length);
+          for (let i = 0; i < this.length; i += 4) {
+            result[i] = this[i + 3];
+            result[i + 1] = this[i + 2];
+            result[i + 2] = this[i + 1];
+            result[i + 3] = this[i];
+          }
+          return createFullBuffer(result);
+        };
+        buf.indexOf = function (search, byteOffset) {
+          byteOffset = byteOffset || 0;
+          if (typeof search === "number") {
+            for (let i = byteOffset; i < this.length; i++) {
+              if (this[i] === search) return i;
+            }
+            return -1;
+          }
+          if (typeof search === "string") {
+            const searchBytes = [];
+            for (let i = 0; i < search.length; i++) {
+              searchBytes.push(search.charCodeAt(i));
+            }
+            outer: for (
+              let i = byteOffset;
+              i <= this.length - searchBytes.length;
+              i++
+            ) {
+              for (let j = 0; j < searchBytes.length; j++) {
+                if (this[i + j] !== searchBytes[j]) continue outer;
+              }
+              return i;
+            }
+            return -1;
           }
           return -1;
-        }
-        return -1;
+        };
+        return buf;
+      }
+
+      window.Buffer = {
+        alloc: function (size, fill, encoding) {
+          const arr = new Uint8Array(size);
+          if (fill !== undefined) {
+            arr.fill(typeof fill === "number" ? fill : fill.charCodeAt(0));
+          }
+          return createFullBuffer(arr);
+        },
+        allocUnsafe: function (size) {
+          return createFullBuffer(new Uint8Array(size));
+        },
+        from: function (arr, encoding) {
+          const buf = createBufferFrom(arr);
+          return createFullBuffer(buf);
+        },
+        concat: function (arrays, length) {
+          if (!length) {
+            length = arrays.reduce(
+              (acc, arr) => acc + (arr.length || arr.byteLength || 0),
+              0,
+            );
+          }
+          const result = new Uint8Array(length);
+          let offset = 0;
+          for (const arr of arrays) {
+            const src = arr instanceof Uint8Array ? arr : createBufferFrom(arr);
+            result.set(src, offset);
+            offset += src.length;
+          }
+          return createFullBuffer(result);
+        },
+        isBuffer: function (obj) {
+          return obj instanceof Uint8Array || (obj && obj.copy && obj.slice);
+        },
       };
-      return buf;
-    }
-    
-    window.Buffer = {
-      alloc: function(size, fill, encoding) {
-        const arr = new Uint8Array(size);
-        if (fill !== undefined) {
-          arr.fill(typeof fill === 'number' ? fill : fill.charCodeAt(0));
+      window.process = {
+        env: {},
+        version: "",
+        nextTick: function (fn) {
+          setTimeout(fn, 0);
+        },
+        browser: true,
+        platform: "browser",
+      };
+    </script>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --primary: #2563eb;
+        --primary-hover: #1d4ed8;
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --border: #e2e8f0;
+        --text: #1e293b;
+        --text-muted: #64748b;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+
+      .app {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      header {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 1rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      h1 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .upload-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+        border: 2px dashed var(--border);
+        border-radius: 8px;
+        margin: 2rem;
+        background: var(--surface);
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+        cursor: pointer;
+      }
+
+      .upload-area:hover,
+      .upload-area.dragover {
+        border-color: var(--primary);
+        background: #eff6ff;
+      }
+
+      .upload-area.hidden {
+        display: none;
+      }
+
+      .upload-icon {
+        width: 48px;
+        height: 48px;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+      }
+
+      .upload-text {
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      .upload-text strong {
+        color: var(--primary);
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      .main-content {
+        display: none;
+        flex: 1;
+        gap: 0;
+      }
+
+      .main-content.visible {
+        display: flex;
+      }
+
+      .sidebar {
+        width: 250px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar-header {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .table-list {
+        flex: 1;
+        overflow-y: auto;
+        max-height: calc(100vh - 250px);
+      }
+
+      .table-item {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.15s;
+      }
+
+      .table-item:hover {
+        background: var(--bg);
+      }
+
+      .table-item.active {
+        background: #eff6ff;
+        border-left: 3px solid var(--primary);
+      }
+
+      .table-name {
+        font-weight: 500;
+      }
+
+      .table-count {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .data-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .data-header {
+        padding: 1rem 1.5rem;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .data-header h2 {
+        font-size: 1rem;
+        font-weight: 600;
+      }
+
+      .data-info {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+      }
+
+      .table-container {
+        flex: 1;
+        overflow: auto;
+        max-height: calc(100vh - 200px);
+        padding: 0;
+      }
+
+      .table-container > div {
+        padding: 1rem;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface);
+        font-size: 0.875rem;
+      }
+
+      thead th {
+        background: var(--surface);
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        box-shadow: 0 2px 0 var(--border);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface);
+        font-size: 0.875rem;
+      }
+
+      th,
+      td {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+
+      tbody th {
+        background: var(--surface);
+        font-weight: 600;
+      }
+
+      tr:hover td {
+        background: #f8fafc;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-muted);
+      }
+
+      .loading {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        color: var(--text-muted);
+      }
+
+      .loading.visible {
+        display: flex;
+      }
+
+      .spinner {
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--border);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-right: 0.5rem;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
         }
-        return createFullBuffer(arr);
-      },
-      allocUnsafe: function(size) {
-        return createFullBuffer(new Uint8Array(size));
-      },
-      from: function(arr, encoding) {
-        const buf = createBufferFrom(arr);
-        return createFullBuffer(buf);
-      },
-      concat: function(arrays, length) {
-        if (!length) {
-          length = arrays.reduce((acc, arr) => acc + (arr.length || arr.byteLength || 0), 0);
-        }
-        const result = new Uint8Array(length);
-        let offset = 0;
-        for (const arr of arrays) {
-          const src = arr instanceof Uint8Array ? arr : createBufferFrom(arr);
-          result.set(src, offset);
-          offset += src.length;
-        }
-        return createFullBuffer(result);
-      },
-      isBuffer: function(obj) { return obj instanceof Uint8Array || (obj && obj.copy && obj.slice); }
-    };
-    window.process = {
-      env: {},
-      version: '',
-      nextTick: function(fn) { setTimeout(fn, 0); },
-      browser: true,
-      platform: 'browser',
-    };
-  </script>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+      }
 
-    :root {
-      --primary: #2563eb;
-      --primary-hover: #1d4ed8;
-      --bg: #f8fafc;
-      --surface: #ffffff;
-      --border: #e2e8f0;
-      --text: #1e293b;
-      --text-muted: #64748b;
-    }
+      .error-message {
+        display: none;
+        padding: 1rem;
+        margin: 1rem 2rem;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 6px;
+        color: #dc2626;
+      }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
+      .error-message.visible {
+        display: block;
+      }
 
-    .app {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
+      .file-info {
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: var(--bg);
+        border-radius: 6px;
+        font-size: 0.875rem;
+      }
 
-    header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+      .file-info.visible {
+        display: flex;
+      }
 
-    h1 {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text);
-    }
+      .file-info button {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 0.25rem;
+      }
 
-    .upload-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 3rem;
-      border: 2px dashed var(--border);
-      border-radius: 8px;
-      margin: 2rem;
-      background: var(--surface);
-      transition: border-color 0.2s, background 0.2s;
-      cursor: pointer;
-    }
-
-    .upload-area:hover, .upload-area.dragover {
-      border-color: var(--primary);
-      background: #eff6ff;
-    }
-
-    .upload-area.hidden {
-      display: none;
-    }
-
-    .upload-icon {
-      width: 48px;
-      height: 48px;
-      color: var(--text-muted);
-      margin-bottom: 1rem;
-    }
-
-    .upload-text {
-      color: var(--text-muted);
-      text-align: center;
-    }
-
-    .upload-text strong {
-      color: var(--primary);
-    }
-
-    input[type="file"] {
-      display: none;
-    }
-
-    .main-content {
-      display: none;
-      flex: 1;
-      gap: 0;
-    }
-
-    .main-content.visible {
-      display: flex;
-    }
-
-    .sidebar {
-      width: 250px;
-      background: var(--surface);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .sidebar-header {
-      padding: 1rem;
-      border-bottom: 1px solid var(--border);
-      font-weight: 600;
-      font-size: 0.875rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .table-list {
-      flex: 1;
-      overflow-y: auto;
-      max-height: calc(100vh - 250px);
-    }
-
-    .table-item {
-      padding: 0.75rem 1rem;
-      cursor: pointer;
-      border-bottom: 1px solid var(--border);
-      transition: background 0.15s;
-    }
-
-    .table-item:hover {
-      background: var(--bg);
-    }
-
-    .table-item.active {
-      background: #eff6ff;
-      border-left: 3px solid var(--primary);
-    }
-
-    .table-name {
-      font-weight: 500;
-    }
-
-    .table-count {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    .data-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .data-header {
-      padding: 1rem 1.5rem;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .data-header h2 {
-      font-size: 1rem;
-      font-weight: 600;
-    }
-
-    .data-info {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-    }
-
-    .table-container {
-      flex: 1;
-      overflow: auto;
-      max-height: calc(100vh - 200px);
-      padding: 0;
-    }
-    
-    .table-container > div {
-      padding: 1rem;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--surface);
-      font-size: 0.875rem;
-    }
-
-    thead th {
-      background: var(--surface);
-      font-weight: 600;
-      position: sticky;
-      top: 0;
-      z-index: 1;
-      box-shadow: 0 2px 0 var(--border);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--surface);
-      font-size: 0.875rem;
-    }
-
-    th, td {
-      padding: 0.75rem 1rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-    }
-    
-    tbody th {
-      background: var(--surface);
-      font-weight: 600;
-    }
-
-    tr:hover td {
-      background: #f8fafc;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 3rem;
-      color: var(--text-muted);
-    }
-
-    .loading {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem;
-      color: var(--text-muted);
-    }
-
-    .loading.visible {
-      display: flex;
-    }
-
-    .spinner {
-      width: 24px;
-      height: 24px;
-      border: 2px solid var(--border);
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-right: 0.5rem;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .error-message {
-      display: none;
-      padding: 1rem;
-      margin: 1rem 2rem;
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      border-radius: 6px;
-      color: #dc2626;
-    }
-
-    .error-message.visible {
-      display: block;
-    }
-
-    .file-info {
-      display: none;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      background: var(--bg);
-      border-radius: 6px;
-      font-size: 0.875rem;
-    }
-
-    .file-info.visible {
-      display: flex;
-    }
-
-    .file-info button {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      padding: 0.25rem;
-    }
-
-    .file-info button:hover {
-      color: var(--primary);
-    }
-  </style>
-</head>
-<body>
-  <div class="app">
-    <header>
-      <h1>Axess</h1>
-      <div class="file-info" id="fileInfo">
-        <span id="fileName"></span>
-        <button id="closeFile" title="Close file">✕</button>
-      </div>
-    </header>
-
-    <div class="error-message" id="errorMessage"></div>
-
-    <div class="upload-area" id="uploadArea">
-      <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-      </svg>
-      <p class="upload-text">
-        <strong>Click to upload</strong> or drag and drop<br>
-        Microsoft Access Database (.mdb, .accdb)
-      </p>
-      <input type="file" id="fileInput" accept=".mdb,.accdb">
-    </div>
-
-    <div class="loading" id="loading">
-      <div class="spinner"></div>
-      <span>Parsing database...</span>
-    </div>
-
-    <div class="main-content" id="mainContent">
-      <div class="sidebar">
-        <div class="sidebar-header">Tables</div>
-        <div class="table-list" id="tableList"></div>
-      </div>
-      <div class="data-panel">
-        <div class="data-header">
-          <h2 id="currentTable">Select a table</h2>
-          <span class="data-info" id="dataInfo"></span>
+      .file-info button:hover {
+        color: var(--primary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>Axess</h1>
+        <div class="file-info" id="fileInfo">
+          <span id="fileName"></span>
+          <button id="closeFile" title="Close file">✕</button>
         </div>
-        <div class="table-container" id="tableContainer">
-          <div class="empty-state">Select a table to view its data</div>
+      </header>
+
+      <div class="error-message" id="errorMessage"></div>
+
+      <div class="upload-area" id="uploadArea">
+        <svg
+          class="upload-icon"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+          />
+        </svg>
+        <p class="upload-text">
+          <strong>Click to upload</strong> or drag and drop<br />
+          Microsoft Access Database (.mdb, .accdb)
+        </p>
+        <input type="file" id="fileInput" accept=".mdb,.accdb" />
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <span>Parsing database...</span>
+      </div>
+
+      <div class="main-content" id="mainContent">
+        <div class="sidebar">
+          <div class="sidebar-header">Tables</div>
+          <div class="table-list" id="tableList"></div>
+        </div>
+        <div class="data-panel">
+          <div class="data-header">
+            <h2 id="currentTable">Select a table</h2>
+            <span class="data-info" id="dataInfo"></span>
+          </div>
+          <div class="table-container" id="tableContainer">
+            <div class="empty-state">Select a table to view its data</div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <script type="module" src="/main.ts"></script>
-</body>
+    <script type="module" src="/main.ts"></script>
+  </body>
 </html>

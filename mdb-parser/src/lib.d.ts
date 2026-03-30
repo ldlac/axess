@@ -10,7 +10,12 @@ declare class Buffer {
   [Symbol.toStringTag]: string;
   slice(start?: number, end?: number): Buffer;
   subarray(start?: number, end?: number): Buffer;
-  copy(target: Buffer, targetStart?: number, sourceStart?: number, sourceEnd?: number): number;
+  copy(
+    target: Buffer,
+    targetStart?: number,
+    sourceStart?: number,
+    sourceEnd?: number,
+  ): number;
   fill(val: number, start?: number, end?: number): this;
   indexOf(search: number | string, byteOffset?: number): number;
   readUInt8(offset?: number): number;

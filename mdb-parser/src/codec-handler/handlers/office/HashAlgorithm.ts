@@ -1,5 +1,5 @@
 export interface HashAlgorithm {
-    readonly id: number;
+  readonly id: number;
 }
 
 const EXTERNAL: HashAlgorithm = { id: 0 };
